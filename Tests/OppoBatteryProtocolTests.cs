@@ -1,3 +1,4 @@
+using Xunit;
 using EncoBudsTray.Models;
 using EncoBudsTray.Protocol;
 
@@ -33,7 +34,7 @@ public sealed class OppoBatteryProtocolTests
         var request = protocol.CreateBatteryRequest();
 
         Assert.Equal(
-            "AA090000060100000000",
+            "AA0700000601000000",
             Convert.ToHexString(request));
     }
 

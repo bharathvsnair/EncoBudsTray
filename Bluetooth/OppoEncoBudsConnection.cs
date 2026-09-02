@@ -56,7 +56,7 @@ public sealed class OppoEncoBudsConnection : IAsyncDisposable
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        if (_socket is null || _reader is null)
+        if (_socket is null || _reader is null || _writer is null)
             throw new InvalidOperationException("Not connected.");
 
         var request = _protocol.CreateBatteryRequest();
