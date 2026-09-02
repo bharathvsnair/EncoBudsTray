@@ -2,22 +2,90 @@
 
 Minimal Windows system-tray battery monitor for **OPPO Enco Buds2**.
 
-It displays only:
+EncoBudsTray does one thing: show the battery status of your earbuds and charging case from the Windows system tray.
+
+![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-blue)
+![.NET](https://img.shields.io/badge/.NET-8-512BD4)
+![License](https://img.shields.io/badge/license-Apache--2.0-green)
+License: Apache-2.0
+
+## ✨ Features
 
 - Left earbud battery
 - Right earbud battery
 - Charging-case battery
+- Automatic Bluetooth Classic RFCOMM connection
+- Automatic reconnect after communication failure
+- Periodic battery updates
+- Manual **Refresh**
+- Simple tray tooltip
+- Lightweight local logging
+- No background Bluetooth scanning while connected
 
-The tray menu contains only **Refresh** and **Exit**.
+The tray menu intentionally contains only **Refresh** and **Exit**.
+
+---
+
+## 📦 Installation
+
+### Recommended: Standalone executable
+
+Download the Windows release and run:
+
+```text
+EncoBudsTray.exe
+```
+
+The standalone build includes the required .NET runtime, so **you do not need to install .NET separately**.
+
+Pair your **OPPO Enco Buds2** with Windows first and make sure Bluetooth is enabled.
+
+> **Note:** The current release targets `win-x64`.
+
+---
+
+## 🚀 Usage
+
+1. Pair the OPPO Enco Buds2 with Windows.
+2. Start `EncoBudsTray.exe`.
+3. The application appears in the Windows system tray.
+4. Hover over the tray icon to see the current battery levels.
+5. Use **Refresh** from the tray menu to request an immediate update.
+
+Example:
+
+```text
+OPPO Enco Buds2
+Left: 70%
+Right: 90%
+Case: 40%
+```
+
+Unavailable values are shown as:
+
+```text
+—
+```
+
+If the earbuds are disconnected:
+
+```text
+OPPO Enco Buds2 — Disconnected
+```
+
+---
 
 ## Requirements
 
 - Windows 10 version 2004 (build 19041) or later
-- .NET 8 SDK
 - OPPO Enco Buds2 paired/available through Windows Bluetooth
 - Bluetooth enabled
 
-## Build
+The **.NET 8 SDK** is only required when building from source.
+
+---
+
+## 🛠️ Building from Source
 
 From the project directory:
 
@@ -26,16 +94,24 @@ dotnet restore
 dotnet build -c Release
 ```
 
-Run:
+Run locally:
 
 ```powershell
 dotnet run -c Release
 ```
 
-Publish a self-contained Windows executable:
+### Run tests
 
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+dotnet test .\Tests\EncoBudsTray.Tests.csproj
+```
+
+Bluetooth hardware is not required for the protocol tests.
+
+### Publish a standalone executable
+
+```powershell
+dotnet publish .\EncoBudsTray.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true
 ```
 
 The published executable is placed under:
@@ -44,55 +120,56 @@ The published executable is placed under:
 bin\Release\net8.0-windows10.0.19041.0\win-x64\publish\
 ```
 
-## Communication model
+---
 
-The implementation follows the OPPO Enco Buds2 path found in the supplied Gadgetbridge source archive.
+## 🔬 How It Works
 
-Gadgetbridge identifies the device through the exact name:
+EncoBudsTray uses the OPPO Enco Buds2 communication path documented by the supplied **Gadgetbridge** source.
+
+Gadgetbridge identifies the device using the exact name:
 
 ```text
 OPPO Enco Buds2
 ```
 
-The Gadgetbridge coordinator is an `AbstractBLClassicDeviceCoordinator`, so this implementation uses Bluetooth Classic RFCOMM.
-
-Gadgetbridge's `OppoHeadphonesSupport` declares this supported RFCOMM service:
+The supported connection uses **Bluetooth Classic RFCOMM** with this service UUID:
 
 ```text
 0000079a-d102-11e1-9b23-00025b00a5a5
 ```
 
-The Windows application discovers that RFCOMM service and additionally verifies the device name before connecting.
+EncoBudsTray discovers that RFCOMM service and verifies the device name before connecting.
 
-No generic headset selection or manually entered Bluetooth address is used.
+It does not require a manually entered Bluetooth address.
 
-## Battery protocol
+Once connected, the application:
 
-Only the battery request/response portion of Gadgetbridge is implemented.
+1. Sends the battery request.
+2. Reads the response.
+3. Parses the battery values.
+4. Updates the tray tooltip.
+5. Repeats the process approximately every 30 seconds.
+
+---
+
+## 📡 Battery Protocol
+
+Only the battery request/response portion of the OPPO protocol is implemented.
 
 ### Request
 
-Gadgetbridge's `OppoCommand.BATTERY_REQ` is:
+Gadgetbridge defines:
 
 ```text
-0x0106
+BATTERY_REQ = 0x0106
 ```
 
-`OppoHeadphonesProtocol.encodeBatteryReq()` constructs the message using the common Gadgetbridge `encodeMessage()` framing:
-
-```text
-AA
-length
-00 00
-06 01
-sequence
-payload-length (00 00)
-```
+The request uses Gadgetbridge's common message framing.
 
 For an empty battery-request payload, the initial request is:
 
 ```text
-AA 09 00 00 06 01 00 00 00
+AA 07 00 00 06 01 00 00 00
 ```
 
 The sequence byte increments for subsequent requests.
@@ -102,20 +179,18 @@ The sequence byte increments for subsequent requests.
 The battery response command is:
 
 ```text
-0x8106
+BATTERY_RET = 0x8106
 ```
 
-The parser follows Gadgetbridge's little-endian response framing and battery parsing.
-
-For each battery entry:
+Battery entries use these mappings:
 
 ```text
-protocol index 1 → application index 0 → Left
-protocol index 2 → application index 1 → Right
-protocol index 3 → application index 2 → Case
+protocol index 1 → Left
+protocol index 2 → Right
+protocol index 3 → Case
 ```
 
-The battery level is:
+The battery level is obtained with:
 
 ```text
 raw byte & 0x7F
@@ -129,11 +204,13 @@ raw byte & 0x80
 
 represents the charging state.
 
-Gadgetbridge ignores a case reading when the case level is zero. The Windows implementation preserves that behavior.
+Gadgetbridge ignores a case reading when the case level is zero, and EncoBudsTray preserves that behavior.
 
-Missing/invalid values are represented as `null`, not `0%`.
+Missing or invalid values are represented internally as `null` rather than `0%`.
 
-## Connection and update behavior
+---
+
+## 🔄 Connection & Update Behavior
 
 The application:
 
@@ -143,42 +220,36 @@ The application:
 4. Reads and parses the response.
 5. Updates the tray tooltip.
 6. Polls again approximately every 30 seconds.
-7. Retries the battery request with a timeout.
-8. Disconnects and reconnects automatically after communication failure.
+7. Retries battery requests when necessary.
+8. Automatically reconnects after communication failure.
 
 Initial discovery uses a short reconnect delay with exponential backoff up to 30 seconds.
 
 A manual **Refresh** wakes the monitor immediately.
 
-No continuous Bluetooth scan is performed while a connection is active.
+The application does not continuously scan for Bluetooth devices while a connection is active.
 
-## Tray display
+---
 
-Connected example:
+## 🧪 Tests
 
-```text
-OPPO Enco Buds2 — L: 70% | R: 90% | Case: 40%
-```
+The test suite covers:
 
-Unavailable value:
+- Gadgetbridge battery-response parsing
+- Left/right/case mapping
+- Charging-bit parsing
+- Gadgetbridge's zero-case behavior
+- Battery request construction
+- Multiple and partial response framing
+- Malformed payload lengths
 
-```text
-OPPO Enco Buds2 — L: 70% | R: 90% | Case: —
-```
+The current test suite passes all **5 tests**.
 
-Disconnected:
+Bluetooth hardware is **not required** for these tests.
 
-```text
-OPPO Enco Buds2 — Disconnected
-```
+---
 
-Searching:
-
-```text
-OPPO Enco Buds2 — Searching...
-```
-
-## Logging
+## 📝 Logging
 
 Lightweight logs are written locally to:
 
@@ -186,15 +257,23 @@ Lightweight logs are written locally to:
 %LOCALAPPDATA%\EncoBudsTray\enco.log
 ```
 
-Only connection state, errors, and parsed battery values are logged by default.
+By default, only the following are logged:
 
-Raw protocol packets are not logged by default.
+- Connection state
+- Errors
+- Parsed battery values
 
-## Gadgetbridge source traceability
+Raw protocol packets are **not logged by default**.
 
-The supplied Gadgetbridge archive is the sole protocol/device source used for this implementation.
+---
 
-Relevant source locations:
+## 🔍 Gadgetbridge Source Traceability
+
+The supplied Gadgetbridge archive was the **sole technical protocol/device source** used to implement the OPPO communication path.
+
+Relevant Gadgetbridge source locations include:
+
+### `OppoEncoBuds2Coordinator.java`
 
 ```text
 app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/oppo/OppoEncoBuds2Coordinator.java
@@ -205,6 +284,8 @@ Used for:
 - Exact supported device name: `OPPO Enco Buds2`
 - Device-specific coordinator identity
 
+### `OppoHeadphonesCoordinator.java`
+
 ```text
 app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/oppo/OppoHeadphonesCoordinator.java
 ```
@@ -214,9 +295,11 @@ Used for:
 - Bluetooth Classic coordinator type
 - Three battery slots
 - Battery index semantics:
-  - 0 = left
-  - 1 = right
-  - 2 = case
+  - `0` = left
+  - `1` = right
+  - `2` = case
+
+### `OppoHeadphonesSupport.java`
 
 ```text
 app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/oppo/OppoHeadphonesSupport.java
@@ -226,8 +309,10 @@ Used for:
 
 - RFCOMM service UUID
 - OPPO serial/RFCOMM support path
-- Gadgetbridge's battery request behavior
-- Gadgetbridge's battery retry behavior
+- Battery request behavior
+- Battery retry behavior
+
+### `OppoHeadphonesProtocol.java`
 
 ```text
 app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/oppo/OppoHeadphonesProtocol.java
@@ -242,6 +327,8 @@ Used for:
 - Charging-bit interpretation
 - Unknown-value behavior
 
+### `OppoCommand.java`
+
 ```text
 app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/oppo/commands/OppoCommand.java
 ```
@@ -251,50 +338,88 @@ Used for:
 - `BATTERY_REQ = 0x0106`
 - `BATTERY_RET = 0x8106`
 
-```text
-app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/serial/AbstractSerialDeviceSupportV2.java
-```
-
-Used to trace that the OPPO implementation sends protocol bytes through the Bluetooth Classic socket path.
-
-```text
-app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/btbr/AbstractBTBRDeviceSupport.java
-```
-
-Used to trace that the OPPO support is using a Bluetooth Classic RFCOMM service UUID and a primary RFCOMM socket.
-
-Test reference:
+### Protocol test reference
 
 ```text
 app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/oppo/OppoHeadphonesProtocolTest.java
 ```
 
-The supplied Gadgetbridge battery-response sample is reproduced as a parser test without copying Gadgetbridge implementation code.
+The supplied Gadgetbridge battery-response sample was used as a parser test reference.
 
-## Tests
+EncoBudsTray does **not** copy Gadgetbridge implementation code.
 
-Run:
+---
 
-```powershell
-dotnet test -c Release
+## 🙏 Acknowledgements
+
+### Gadgetbridge
+
+This project would not have been possible without the protocol and device research contained in **Gadgetbridge**.
+
+Gadgetbridge is licensed under the **GNU Affero General Public License v3 (AGPLv3)**. Its source was used as the technical reference for the OPPO Enco Buds2 communication behavior implemented here.
+
+EncoBudsTray is an independent C# implementation and does not include copied Gadgetbridge source files.
+
+### obudsmanager
+
+The existence of the community **obudsmanager** project was an inspiration for building a small, focused Windows utility for OPPO earbuds.
+
+No protocol implementation or source code from obudsmanager was used as the technical basis of EncoBudsTray.
+
+---
+
+## 🎯 Scope
+
+EncoBudsTray deliberately has a narrow scope.
+
+It does **not** implement:
+
+- EQ
+- ANC or listening modes
+- Game mode
+- Touch controls
+- Firmware operations
+- Audio or media controls
+- Earbud configuration
+- Account/cloud services
+- A large settings interface
+
+The goal is a small, focused utility that answers one question:
+
+> **How much battery do my Enco Buds2 have?**
+
+---
+
+## ⚠️ Limitations
+
+- The application requires Windows to expose the Gadgetbridge-supported RFCOMM service through the Windows Bluetooth APIs.
+- The current release targets `win-x64`.
+- Bluetooth behavior can vary between Windows Bluetooth adapters and drivers.
+- Battery updates depend on the earbuds responding to the supported protocol.
+- This project is specifically designed for **OPPO Enco Buds2** and does not claim compatibility with other OPPO or OnePlus earbuds.
+
+---
+
+## 🔒 Privacy
+
+EncoBudsTray does not require an account or cloud service.
+
+It communicates locally with the paired earbuds over Bluetooth and writes only its lightweight application log to:
+
+```text
+%LOCALAPPDATA%\EncoBudsTray
 ```
 
-The tests cover:
+---
 
-- Gadgetbridge battery-response parsing
-- Left/right/case mapping
-- Charging-bit parsing
-- Gadgetbridge's zero-case behavior
-- Battery request construction
-- Multiple/partial response framing
-- Malformed payload lengths
+## 📜 License
 
-Bluetooth hardware is not required for parser tests.
+EncoBudsTray is licensed under the **Apache License 2.0**.
 
-## Known limitations
+See [`LICENSE`](LICENSE) for the full license text.
 
-- This project implements only the battery protocol path.
-- It does not reproduce Gadgetbridge's unrelated initialization commands.
-- It does not implement EQ, listening modes, game mode, touch controls, ANC, firmware operations, audio, media, or other earbud functionality.
-- The application requires Windows to expose the Gadgetbridge-supported RFCOMM service to the Windows Bluetooth APIs.
-- Actual Bluetooth integration should be validated on a Windows system with the Enco Buds2 because the supplied development environment does not contain the Windows/.NET SDK needed for a hardware build test.
+The Apache-2.0 license applies to the original EncoBudsTray code. Gadgetbridge remains licensed under its own AGPLv3 license; this project does **not** relicense Gadgetbridge.
+
+---
+
+**Made for a very specific problem: seeing your Enco Buds2 battery without opening a giant companion app.**

@@ -1,5 +1,30 @@
+# Build output
 bin/
 obj/
+
+# Visual Studio
 .vs/
 *.user
 *.suo
+
+# JetBrains Rider / ReSharper
+.idea/
+_ReSharper*/
+*.DotSettings.user
+
+# Test output
+TestResults/
+
+# Logs
+*.log
+*.log.*
+
+# OS files
+Thumbs.db
+Desktop.ini
+
+# Published builds
+publish/
+
+# Temporary files
+*.tmp

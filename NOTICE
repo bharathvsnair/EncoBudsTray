@@ -1,0 +1,30 @@
+EncoBudsTray
+Copyright 2026 @bharathvsnair
+
+This project is an independent Windows tray application for displaying
+battery information from OPPO Enco Buds2 earbuds.
+
+Third-party acknowledgements
+============================
+
+Gadgetbridge
+------------
+EncoBudsTray's Bluetooth protocol implementation was independently
+implemented with technical reference to the [Gadgetbridge](https://gadgetbridge.org/)
+ project,
+particularly its OPPO Enco Buds2 support.
+
+Gadgetbridge is an independent open-source project and is licensed under
+the GNU Affero General Public License v3.0 (AGPL-3.0).
+
+This project does not include or redistribute Gadgetbridge source code.
+
+
+
+OBudsManager
+------------
+The existence and general concept of the community [OBudsManager](https://github.com/siddhesh17b/OBudsManager)
+project served as inspiration for this project.
+
+No protocol implementation or source code from OBudsManager was used
+in EncoBudsTray.
