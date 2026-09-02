@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore application
+        run: dotnet restore .\EncoBudsTray.csproj
+
+      - name: Restore tests
+        run: dotnet restore .\Tests\EncoBudsTray.Tests.csproj
+
+      - name: Build
+        run: dotnet build .\EncoBudsTray.csproj --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test .\Tests\EncoBudsTray.Tests.csproj --configuration Release --no-restore
