@@ -7,7 +7,6 @@ EncoBudsTray does one thing: show the battery status of your earbuds and chargin
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-blue)
 ![.NET](https://img.shields.io/badge/.NET-8-512BD4)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green)
-License: Apache-2.0
 
 ## ✨ Features
 
